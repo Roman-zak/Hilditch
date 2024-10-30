@@ -2,6 +2,10 @@ import numpy as np
 from PIL import Image
 
 
+def binarize_channel(channel, threshold=128):
+  """Binarize a single color channel based on a threshold."""
+  return (channel > threshold).astype(np.uint8)
+
 def binarize_image(image, threshold=128):
   """
   Converts a grayscale image to binary by setting pixels to either 0 or 255

@@ -3,7 +3,7 @@ from tkinter import filedialog, messagebox
 import numpy as np
 from PIL import Image
 from image_components import PanZoomCanvas
-from image_utils import binarize_image
+from image_utils import binarize_image, binarize_channel
 from skeletonization import hilditch_skeletonize, find_branch_and_end_points
 
 
@@ -71,16 +71,30 @@ class ImageSkeletonApp:
 
   def process_image(self):
     if self.original_canvas.pil_image:
-      image = self.original_canvas.pil_image
-      gray_image = image.convert("L")
+      # image = self.original_canvas.pil_image
+      # gray_image = image.convert("L")
+      #
+      # # Get the current threshold value from the slider
+      # threshold_value = self.threshold_slider.get()
+      # binary_image = np.array(
+      #   binarize_image(gray_image, threshold_value)) // 255
+      image = self.original_canvas.pil_image.convert("RGB")
+      r, g, b = image.split()
 
       # Get the current threshold value from the slider
       threshold_value = self.threshold_slider.get()
-      binary_image = np.array(
-        binarize_image(gray_image, threshold_value)) // 255
+
+      # Binarize each channel separately
+      r_bin = binarize_channel(np.array(r), threshold_value)
+      g_bin = binarize_channel(np.array(g), threshold_value)
+      b_bin = binarize_channel(np.array(b), threshold_value)
+
+      # Combine the binary channels (logical OR)
+      combined_binary = np.logical_or.reduce([r_bin, g_bin, b_bin]).astype(
+        np.uint8)
 
       # Perform skeletonization
-      skeleton = hilditch_skeletonize(binary_image, self.bg_color.get()) * 255
+      skeleton = hilditch_skeletonize(combined_binary, self.bg_color.get()) * 255
       processed_image = Image.fromarray(skeleton.astype(np.uint8))
 
       # Display the processed image
