@@ -1,11 +1,10 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
 import numpy as np
-
+from PIL import Image
 from image_components import PanZoomCanvas
 from image_utils import binarize_image
-from skeletonization import hilditch_skeletonize, skeletonize
+from skeletonization import hilditch_skeletonize, find_branch_and_end_points
 
 
 class ImageSkeletonApp:
@@ -37,11 +36,16 @@ class ImageSkeletonApp:
     self.bg_frame.pack(pady=10)
     tk.Label(self.bg_frame, text="Choose Background Color:").pack(side=tk.LEFT)
     tk.Radiobutton(self.bg_frame, text="Black", variable=self.bg_color,
-                   value=0).pack(
-      side=tk.LEFT)
+                   value=0).pack(side=tk.LEFT)
     tk.Radiobutton(self.bg_frame, text="White", variable=self.bg_color,
-                   value=1).pack(
-      side=tk.LEFT)
+                   value=1).pack(side=tk.LEFT)
+
+    # Intensity threshold slider
+    self.threshold_label = tk.Label(root, text="Intensity Threshold:")
+    self.threshold_label.pack()
+    self.threshold_slider = tk.Scale(root, from_=0, to=255, orient="horizontal")
+    self.threshold_slider.set(100)  # Default threshold
+    self.threshold_slider.pack(pady=10)
 
     # Frame for side-by-side canvases
     self.canvas_frame = tk.Frame(root)
@@ -52,18 +56,6 @@ class ImageSkeletonApp:
     self.original_canvas.grid(row=0, column=0, padx=5, pady=5)
     self.processed_canvas = PanZoomCanvas(self.canvas_frame)
     self.processed_canvas.grid(row=0, column=1, padx=5, pady=5)
-
-  #   # Initial background update
-  #   self.update_background()
-  #
-  # def update_background(self):
-  #   """Updates the background color of both canvases based on selection."""
-  #   bg_color = self.bg_color.get()
-  #   bg_color_name = "black"
-  #   if bg_color:
-  #     bg_color_name = "white"
-  #   self.original_canvas.canvas.config(background=bg_color_name)
-  #   self.processed_canvas.canvas.config(background=bg_color_name)
 
   def upload_image(self):
     try:
@@ -79,10 +71,19 @@ class ImageSkeletonApp:
 
   def process_image(self):
     if self.original_canvas.pil_image:
+      image = self.original_canvas.pil_image
+      gray_image = image.convert("L")
+
+      # Get the current threshold value from the slider
+      threshold_value = self.threshold_slider.get()
       binary_image = np.array(
-        binarize_image(self.original_canvas.pil_image.convert("L"), 200)) // 255
+        binarize_image(gray_image, threshold_value)) // 255
+
+      # Perform skeletonization
       skeleton = hilditch_skeletonize(binary_image, self.bg_color.get()) * 255
       processed_image = Image.fromarray(skeleton.astype(np.uint8))
+
+      # Display the processed image
       self.processed_canvas.set_pil_image(processed_image)
       self.save_button.config(state=tk.NORMAL)
 

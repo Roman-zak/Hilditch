@@ -88,3 +88,38 @@ def skeletonize(binary_image):
   skeleton = skeleton.astype(np.uint8)
 
   return skeleton
+
+
+def find_branch_and_end_points(skeleton):
+  """
+  Знаходить точки розгалуження і кінцеві точки на скелетизованому зображенні.
+
+  Parameters:
+  skeleton (numpy.ndarray): Скелетизоване зображення (бінарне, де 1 — лінія, а 0 — фон).
+
+  Returns:
+  tuple: Маски кінцевих і розгалужувальних точок.
+  """
+  # Розмір зображення
+  rows, cols = skeleton.shape
+
+  # Ініціалізуємо маски для кінцевих і розгалужувальних точок
+  end_points = np.zeros((rows, cols), dtype=bool)
+  branch_points = np.zeros((rows, cols), dtype=bool)
+
+  # Проходимо по кожному пікселю скелета
+  for i in range(1, rows - 1):
+    for j in range(1, cols - 1):
+      if skeleton[i, j] == 1:
+        # Виділяємо 8 сусідів
+        neighbors = skeleton[i - 1:i + 2, j - 1:j + 2].flatten()
+        neighbors[4] = 0  # Виключаємо сам піксель
+        count = np.sum(neighbors)
+
+        # Умови для кінцевих і розгалужувальних точок
+        if count == 1:
+          end_points[i, j] = True  # Кінцева точка
+        elif count >= 3:
+          branch_points[i, j] = True  # Точка розгалуження
+
+  return end_points, branch_points
