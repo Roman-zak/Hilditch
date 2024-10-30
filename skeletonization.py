@@ -3,7 +3,7 @@ from skimage import morphology
 from skimage.util import invert
 
 
-def hilditch_skeletonize(image):
+def hilditch_skeletonize(image, background_color):
   # Define 8-neighborhood indices for clockwise sequence around p1
   neighbors_indices = [
     (-1, 0), (-1, 1), (0, 1), (1, 1),
@@ -12,6 +12,9 @@ def hilditch_skeletonize(image):
 
   # Convert image to binary (0 and 1) format
   image = (image > 0).astype(int)
+  if background_color:
+    # Invert the array
+    image = 1 - image
   change = True
 
   def B(p):
