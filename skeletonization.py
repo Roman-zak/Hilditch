@@ -3,12 +3,30 @@ from skimage import morphology
 from skimage.util import invert
 
 
-def hilditch_skeletonize(image, background_color, progress_bar=None):
-  # Define 8-neighborhood indices for clockwise sequence around p1
+def B(p):
+  # Count non-zero neighbors of p
+  return np.sum(p)
+
+
+def A(p):
+  # Count transitions from 0 to 1 in the ordered sequence
+  p.append(p[0])
+  count = 0
+  for i in range(len(p) - 1):
+    if p[i] == 0 and p[i + 1] == 1:
+      count += 1
+  return count
+
+def get_p(canvas, x, y):
   neighbors_indices = [
     (-1, 0), (-1, 1), (0, 1), (1, 1),
     (1, 0), (1, -1), (0, -1), (-1, -1)
   ]
+  return [canvas[x + di, y + dj] for di, dj in neighbors_indices]
+
+
+def hilditch_skeletonize(image, background_color, progress_bar=None):
+  # Define 8-neighborhood indices for clockwise sequence around p1
 
   # Convert image to binary (0 and 1) format
   image = (image > 0).astype(int)
@@ -16,22 +34,6 @@ def hilditch_skeletonize(image, background_color, progress_bar=None):
     # Invert the array
     image = 1 - image
   change = True
-
-  def B(p):
-    # Count non-zero neighbors of p
-    return np.sum(p)
-
-  def A(p):
-    # Count transitions from 0 to 1 in the ordered sequence
-    p.append(p[0])
-    count = 0
-    for i in range(len(p) - 1):
-      if p[i] == 0 and p[i + 1] == 1:
-        count += 1
-    return count
-
-  def get_p(canvas, x, y):
-    return [canvas[x + di, y + dj] for di, dj in neighbors_indices]
 
   total_pixels = np.sum(image == 1)
   cumulative_removed_pixels = 0
@@ -112,28 +114,42 @@ def find_branch_and_end_points(skeleton):
   skeleton (numpy.ndarray): Скелетизоване зображення (бінарне, де 1 — лінія, а 0 — фон).
 
   Returns:
-  tuple: Маски кінцевих і розгалужувальних точок.
+  tuple: Списки координат кінцевих і розгалужувальних точок.
   """
+
+  skeleton = (skeleton == 255).astype(int)
   # Розмір зображення
   rows, cols = skeleton.shape
 
-  # Ініціалізуємо маски для кінцевих і розгалужувальних точок
-  end_points = np.zeros((rows, cols), dtype=bool)
-  branch_points = np.zeros((rows, cols), dtype=bool)
+  # Ініціалізуємо списки для кінцевих і розгалужувальних точок
+  end_points = []
+  branch_points = []
+
+  # # Функція для підрахунку кількості переходів з 0 до 1 серед сусідів
+  # def count_transitions(neighbors):
+  #   transitions = 0
+  #   for k in range(len(neighbors) - 1):
+  #     if neighbors[k] == 0 and neighbors[k + 1] == 1:
+  #       transitions += 1
+  #   return transitions
 
   # Проходимо по кожному пікселю скелета
   for i in range(1, rows - 1):
     for j in range(1, cols - 1):
       if skeleton[i, j] == 1:
         # Виділяємо 8 сусідів
-        neighbors = skeleton[i - 1:i + 2, j - 1:j + 2].flatten()
-        neighbors[4] = 0  # Виключаємо сам піксель
+        neighbors = get_p(skeleton, i, j)
+
+        # Підраховуємо кількість сусідів, що дорівнюють 1
         count = np.sum(neighbors)
+
+        # Підраховуємо кількість переходів з 0 до 1 у сусідах
+        transitions = A(neighbors + [neighbors[0]])
 
         # Умови для кінцевих і розгалужувальних точок
         if count == 1:
-          end_points[i, j] = True  # Кінцева точка
-        elif count >= 3:
-          branch_points[i, j] = True  # Точка розгалуження
+          end_points.append((i, j))  # Додаємо координати кінцевої точки
+        elif count >= 3 and transitions >= 3:
+          branch_points.append((i, j))  # Додаємо координати точки розгалуження
 
   return end_points, branch_points

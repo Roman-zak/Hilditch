@@ -98,25 +98,43 @@ class ImageSkeletonApp:
       self.save_button.config(state=tk.NORMAL)
       self.process_button.config(state=tk.NORMAL)
 
-
   def process_image(self):
     if self.original_canvas.pil_image:
+      # Convert to grayscale and binarize
       image = self.original_canvas.pil_image
       gray_image = image.convert("L")
-
-      # Get the current threshold value from the slider
       threshold_value = self.threshold_slider.get()
       binary_image = np.array(
         binarize_image(gray_image, threshold_value)) // 255
 
       self.progress_bar["maximum"] = 100
-      # Perform skeletonization
-      skeleton = hilditch_skeletonize(binary_image, self.bg_color.get(), self.progress_bar) * 255
 
+      # Perform skeletonization
+      skeleton = hilditch_skeletonize(binary_image, self.bg_color.get(),
+                                      self.progress_bar) * 255
       processed_image = Image.fromarray(skeleton.astype(np.uint8))
 
-      # Display the processed image
-      self.processed_canvas.set_pil_image(processed_image)
+      # Find endpoints and branch points
+      end_points, branch_points = find_branch_and_end_points(
+        skeleton)
+
+      # Convert the skeleton to RGB for colored marking
+      colored_image = np.stack([skeleton] * 3, axis=-1).astype(np.uint8)
+
+      # Mark end points in blue and branch points in red
+      for point in end_points:
+        x, y = point[0], point[1]  # Unpack coordinates
+        colored_image[x, y] = [0, 0, 255]  # Blue for endpoints
+
+      for point in branch_points:
+        x, y = point[0], point[1]  # Unpack coordinates
+        colored_image[x, y] = [255, 0, 0]  # Red for branch points
+
+      # Convert the numpy array to an Image object
+      final_image = Image.fromarray(colored_image)
+
+      # Display the processed image with colored points
+      self.processed_canvas.set_pil_image(final_image)
       self.save_button.config(state=tk.NORMAL)
 
   def save_image(self):
