@@ -4,7 +4,7 @@ from tkinter import filedialog, messagebox, ttk
 import numpy as np
 from PIL import Image
 from image_components import PanZoomCanvas
-from image_utils import binarize_image, binarize_channel
+from image_utils import binarize_image
 from skeletonization import hilditch_skeletonize, find_branch_and_end_points
 
 
@@ -52,6 +52,7 @@ class ImageSkeletonApp:
     self.progress_bar = ttk.Progressbar(root, orient="horizontal", length=300,
                                         mode="determinate")
     self.progress_bar.pack(pady=10)
+
     # Frame for side-by-side canvases
     self.canvas_frame = tk.Frame(root)
     self.canvas_frame.pack(pady=10, expand=True)
@@ -98,6 +99,24 @@ class ImageSkeletonApp:
       self.save_button.config(state=tk.NORMAL)
       self.process_button.config(state=tk.NORMAL)
 
+  def split_image_with_overlap(self, image_array, num_splits=4, padding=5):
+    """Split the image into smaller chunks with overlap (padding) to avoid artifacts at boundaries."""
+    h, w = image_array.shape
+    split_height = h // num_splits
+    chunks = []
+
+    for i in range(num_splits):
+      y_start = max(i * split_height - padding, 0)
+      y_end = min((i + 1) * split_height + padding, h)
+      chunk = image_array[y_start:y_end]
+      chunks.append((chunk, y_start, y_end))
+
+    return chunks
+
+  def process_image_chunk(self, chunk, start, end, result_dict, idx):
+    """Skeletonize a chunk of the image and store it in a result dictionary."""
+    result_dict[idx] = hilditch_skeletonize(chunk, self.bg_color.get())
+
   def process_image(self):
     if self.original_canvas.pil_image:
       # Convert to grayscale and binarize
@@ -107,19 +126,39 @@ class ImageSkeletonApp:
       binary_image = np.array(
         binarize_image(gray_image, threshold_value)) // 255
 
-      self.progress_bar["maximum"] = 100
+      # Split image with padding for parallel processing
+      chunks = self.split_image_with_overlap(binary_image)
 
-      # Perform skeletonization
-      skeleton = hilditch_skeletonize(binary_image, self.bg_color.get(),
-                                      self.progress_bar) * 255
-      processed_image = Image.fromarray(skeleton.astype(np.uint8))
+      # Dictionary to collect results from each thread
+      results = {}
+      threads = []
+
+      # Process each chunk in parallel
+      for idx, (chunk, start, end) in enumerate(chunks):
+        thread = threading.Thread(target=self.process_image_chunk,
+                                  args=(chunk, start, end, results, idx))
+        threads.append(thread)
+        thread.start()
+
+      # Wait for all threads to finish
+      for thread in threads:
+        thread.join()
+
+      # Reassemble the processed chunks into a single skeletonized image
+      skeleton = np.zeros_like(binary_image)
+      for idx, (chunk, start, end) in enumerate(chunks):
+        processed_chunk = results[idx]
+        padding = 5 if idx != 0 and idx != len(
+          chunks) - 1 else 0  # Remove padding for middle chunks
+        skeleton[start + padding:end - padding] = processed_chunk[
+                                                  padding:processed_chunk.shape[
+                                                            0] - padding]
 
       # Find endpoints and branch points
-      end_points, branch_points = find_branch_and_end_points(
-        skeleton)
+      end_points, branch_points = find_branch_and_end_points(skeleton)
 
       # Convert the skeleton to RGB for colored marking
-      colored_image = np.stack([skeleton] * 3, axis=-1).astype(np.uint8)
+      colored_image = np.stack([skeleton * 255] * 3, axis=-1).astype(np.uint8)
 
       # Mark end points in blue and branch points in red
       for point in end_points:

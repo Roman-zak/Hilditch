@@ -117,7 +117,6 @@ def find_branch_and_end_points(skeleton):
   tuple: Списки координат кінцевих і розгалужувальних точок.
   """
 
-  skeleton = (skeleton == 255).astype(int)
   rows, cols = skeleton.shape
 
   end_points = []
