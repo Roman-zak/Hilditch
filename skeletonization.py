@@ -118,38 +118,23 @@ def find_branch_and_end_points(skeleton):
   """
 
   skeleton = (skeleton == 255).astype(int)
-  # Розмір зображення
   rows, cols = skeleton.shape
 
-  # Ініціалізуємо списки для кінцевих і розгалужувальних точок
   end_points = []
   branch_points = []
 
-  # # Функція для підрахунку кількості переходів з 0 до 1 серед сусідів
-  # def count_transitions(neighbors):
-  #   transitions = 0
-  #   for k in range(len(neighbors) - 1):
-  #     if neighbors[k] == 0 and neighbors[k + 1] == 1:
-  #       transitions += 1
-  #   return transitions
-
-  # Проходимо по кожному пікселю скелета
   for i in range(1, rows - 1):
     for j in range(1, cols - 1):
       if skeleton[i, j] == 1:
-        # Виділяємо 8 сусідів
         neighbors = get_p(skeleton, i, j)
 
-        # Підраховуємо кількість сусідів, що дорівнюють 1
         count = np.sum(neighbors)
 
-        # Підраховуємо кількість переходів з 0 до 1 у сусідах
         transitions = A(neighbors + [neighbors[0]])
 
-        # Умови для кінцевих і розгалужувальних точок
         if count == 1:
-          end_points.append((i, j))  # Додаємо координати кінцевої точки
+          end_points.append((i, j))
         elif count >= 3 and transitions >= 3:
-          branch_points.append((i, j))  # Додаємо координати точки розгалуження
+          branch_points.append((i, j))
 
   return end_points, branch_points
