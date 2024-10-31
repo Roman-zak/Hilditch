@@ -1,5 +1,6 @@
+import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 import numpy as np
 from PIL import Image
 from image_components import PanZoomCanvas
@@ -22,7 +23,7 @@ class ImageSkeletonApp:
     self.upload_button.pack(pady=10)
 
     self.process_button = tk.Button(root, text="Process Image",
-                                    command=self.process_image)
+                                    command=self.start_skeletonization_thread)
     self.process_button.pack(pady=10)
     self.process_button.config(state=tk.DISABLED)
 
@@ -47,6 +48,10 @@ class ImageSkeletonApp:
     self.threshold_slider.set(100)  # Default threshold
     self.threshold_slider.pack(pady=10)
 
+    # Progress bar for skeletonization
+    self.progress_bar = ttk.Progressbar(root, orient="horizontal", length=300,
+                                        mode="determinate")
+    self.progress_bar.pack(pady=10)
     # Frame for side-by-side canvases
     self.canvas_frame = tk.Frame(root)
     self.canvas_frame.pack(pady=10, expand=True)
@@ -56,6 +61,8 @@ class ImageSkeletonApp:
     self.original_canvas.grid(row=0, column=0, padx=5, pady=5)
     self.processed_canvas = PanZoomCanvas(self.canvas_frame)
     self.processed_canvas.grid(row=0, column=1, padx=5, pady=5)
+
+    self.processing_thread = None  # To track the skeletonization thread
 
   def upload_image(self):
     try:
@@ -69,32 +76,43 @@ class ImageSkeletonApp:
     except Exception as e:
       messagebox.showerror("File Open Error", f"An error occurred: {e}")
 
+  def start_skeletonization_thread(self):
+    """Start the skeletonization process in a separate thread."""
+    self.process_button.config(state=tk.DISABLED)
+    self.save_button.config(state=tk.DISABLED)
+    self.progress_bar["value"] = 0  # Reset progress bar
+
+    # Start skeletonization in a new thread
+    self.processing_thread = threading.Thread(target=self.process_image)
+    self.processing_thread.start()
+
+    # Check thread status
+    self.root.after(100, self.check_skeletonization_thread)
+
+  def check_skeletonization_thread(self):
+    """Check if the skeletonization thread is still running."""
+    if self.processing_thread.is_alive():
+      self.root.after(100, self.check_skeletonization_thread)
+    else:
+      # Enable save button after processing is complete
+      self.save_button.config(state=tk.NORMAL)
+      self.process_button.config(state=tk.NORMAL)
+
+
   def process_image(self):
     if self.original_canvas.pil_image:
-      # image = self.original_canvas.pil_image
-      # gray_image = image.convert("L")
-      #
-      # # Get the current threshold value from the slider
-      # threshold_value = self.threshold_slider.get()
-      # binary_image = np.array(
-      #   binarize_image(gray_image, threshold_value)) // 255
-      image = self.original_canvas.pil_image.convert("RGB")
-      r, g, b = image.split()
+      image = self.original_canvas.pil_image
+      gray_image = image.convert("L")
 
       # Get the current threshold value from the slider
       threshold_value = self.threshold_slider.get()
+      binary_image = np.array(
+        binarize_image(gray_image, threshold_value)) // 255
 
-      # Binarize each channel separately
-      r_bin = binarize_channel(np.array(r), threshold_value)
-      g_bin = binarize_channel(np.array(g), threshold_value)
-      b_bin = binarize_channel(np.array(b), threshold_value)
-
-      # Combine the binary channels (logical OR)
-      combined_binary = np.logical_or.reduce([r_bin, g_bin, b_bin]).astype(
-        np.uint8)
-
+      self.progress_bar["maximum"] = 100
       # Perform skeletonization
-      skeleton = hilditch_skeletonize(combined_binary, self.bg_color.get()) * 255
+      skeleton = hilditch_skeletonize(binary_image, self.bg_color.get(), self.progress_bar) * 255
+
       processed_image = Image.fromarray(skeleton.astype(np.uint8))
 
       # Display the processed image

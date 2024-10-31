@@ -3,7 +3,7 @@ from skimage import morphology
 from skimage.util import invert
 
 
-def hilditch_skeletonize(image, background_color):
+def hilditch_skeletonize(image, background_color, progress_bar=None):
   # Define 8-neighborhood indices for clockwise sequence around p1
   neighbors_indices = [
     (-1, 0), (-1, 1), (0, 1), (1, 1),
@@ -33,12 +33,15 @@ def hilditch_skeletonize(image, background_color):
   def get_p(canvas, x, y):
     return [canvas[x + di, y + dj] for di, dj in neighbors_indices]
 
+  total_pixels = np.sum(image == 1)
+  cumulative_removed_pixels = 0
+
   while change:
     change = False
     to_remove = np.zeros(image.shape, dtype=bool)
-
     # Iterate over each pixel (excluding borders for simplicity)
     for i in range(1, image.shape[0] - 2):
+      pixels_removed_in_iteration = 0
       for j in range(1, image.shape[1] - 2):
         p1 = image[i, j]
 
@@ -59,10 +62,21 @@ def hilditch_skeletonize(image, background_color):
               (neighbors[0] * neighbors[2] * neighbors[4] == 0 or A(
                 get_p(image, i, j + 1)) != 1)):
             to_remove[i, j] = True
+            pixels_removed_in_iteration += 1
             change = True
-
+      cumulative_removed_pixels += pixels_removed_in_iteration
+      # Update progress based on cumulative removed pixels
+      if progress_bar and total_pixels > 0:
+        progress_percentage = (cumulative_removed_pixels / total_pixels) * 100
+        progress_bar["value"] = progress_percentage
+        progress_bar.update_idletasks()
     # Remove pixels that met all conditions
     image[to_remove] = 0
+
+  # Set progress bar to completed
+  if progress_bar:
+    progress_bar["value"] = 100
+    progress_bar.update_idletasks()
 
   return image
 
