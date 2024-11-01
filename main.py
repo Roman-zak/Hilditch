@@ -4,32 +4,35 @@ from tkinter import filedialog, messagebox, ttk
 import numpy as np
 from PIL import Image
 from image_components import PanZoomCanvas
-from image_utils import binarize_image, binarize_channel
+from image_utils import binarize_image
 from skeletonization import hilditch_skeletonize, find_branch_and_end_points
 
 
 class ImageSkeletonApp:
   def __init__(self, root):
     self.root = root
-    self.root.title("Image Skeletonization App with Pan and Zoom")
+    self.root.title("Image Skeletonization")
     self.root.geometry("1200x800")
 
     # Background color option
     self.bg_color = tk.BooleanVar(value=0)  # Default to black
 
-    # Upload and process buttons
-    self.upload_button = tk.Button(root, text="Upload Image",
-                                   command=self.upload_image)
-    self.upload_button.pack(pady=10)
+    # UI layout for Upload, Process, and Save buttons
+    button_frame = tk.Frame(root)
+    button_frame.pack(pady=10)
 
-    self.process_button = tk.Button(root, text="Process Image",
+    self.upload_button = tk.Button(button_frame, text="Upload Image",
+                                   command=self.upload_image)
+    self.upload_button.grid(row=0, column=0, padx=5)
+
+    self.process_button = tk.Button(button_frame, text="Process Image",
                                     command=self.start_skeletonization_thread)
-    self.process_button.pack(pady=10)
+    self.process_button.grid(row=0, column=1, padx=5)
     self.process_button.config(state=tk.DISABLED)
 
-    self.save_button = tk.Button(root, text="Save Processed Image",
+    self.save_button = tk.Button(button_frame, text="Save Processed Image",
                                  command=self.save_image)
-    self.save_button.pack(pady=10)
+    self.save_button.grid(row=0, column=2, padx=5)
     self.save_button.config(state=tk.DISABLED)
 
     # Background color selection
@@ -52,6 +55,7 @@ class ImageSkeletonApp:
     self.progress_bar = ttk.Progressbar(root, orient="horizontal", length=300,
                                         mode="determinate")
     self.progress_bar.pack(pady=10)
+
     # Frame for side-by-side canvases
     self.canvas_frame = tk.Frame(root)
     self.canvas_frame.pack(pady=10, expand=True)
@@ -62,6 +66,10 @@ class ImageSkeletonApp:
     self.processed_canvas = PanZoomCanvas(self.canvas_frame)
     self.processed_canvas.grid(row=0, column=1, padx=5, pady=5)
 
+    # Define fixed sizes for canvas to prevent resizing after image upload
+    self.canvas_width = 512
+    self.canvas_height = 512
+
     self.processing_thread = None  # To track the skeletonization thread
 
   def upload_image(self):
@@ -71,7 +79,10 @@ class ImageSkeletonApp:
                    ("BMP files", "*.bmp")]
       )
       if file_path:
-        self.original_canvas.set_image(file_path)
+        self.original_canvas.set_image(file_path, self.canvas_width,
+                                       self.canvas_height)
+        self.processed_canvas.set_blank_image(self.canvas_width,
+                                              self.canvas_height)
         self.process_button.config(state=tk.NORMAL)
     except Exception as e:
       messagebox.showerror("File Open Error", f"An error occurred: {e}")

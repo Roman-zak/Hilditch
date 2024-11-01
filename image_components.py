@@ -3,7 +3,7 @@ import numpy as np
 from PIL import Image, ImageTk
 
 class PanZoomCanvas(tk.Frame):
-    def __init__(self, master, canvas_w=512, canvas_h=768):
+    def __init__(self, master, canvas_w=512, canvas_h=512):
         super().__init__(master)
         self.pil_image = None  # Image data to be displayed
         self.canvas_w = canvas_w
@@ -12,6 +12,7 @@ class PanZoomCanvas(tk.Frame):
         self.reset_transform()  # Initial affine transformation matrix
         self.min_scale = 0.1  # Minimum scale to prevent excessive zoom out
         self.max_scale = 10.0  # Maximum scale to prevent excessive zoom in
+        self.fixed_canvas_size = True  # Keep canvas size fixed after setting an image
 
     def create_widget(self, width, height):
         # Canvas
@@ -23,33 +24,23 @@ class PanZoomCanvas(tk.Frame):
         self.canvas.bind("<Double-Button-1>", self.mouse_double_click_left)
         self.canvas.bind("<MouseWheel>", self.mouse_wheel)
 
-    def set_image(self, filename):
-        '''To open an image file'''
+    def set_image(self, filename, width=None, height=None):
+        """To open an image file and display it with a fixed size."""
         if not filename:
             return
         self.pil_image = Image.open(filename)
-        # Adjust canvas size to match the aspect ratio of the image
-        self.adjust_canvas_to_image()
+        self.canvas_w = width if width else self.canvas_w
+        self.canvas_h = height if height else self.canvas_h
+        self.canvas.config(width=self.canvas_w, height=self.canvas_h)
         self.zoom_fit(self.pil_image.width, self.pil_image.height)
         self.redraw_image()
 
-    def adjust_canvas_to_image(self):
-        """Resize the canvas to maintain the image's aspect ratio."""
-        img_width, img_height = self.pil_image.size
-        aspect_ratio = img_width / img_height
-        max_canvas_width = self.winfo_toplevel().winfo_width() // 2 - 20  # Allow for border padding
-        max_canvas_height = self.winfo_toplevel().winfo_height() - 150  # Adjust for UI elements
-
-        # Calculate new dimensions based on the max dimensions and aspect ratio
-        if max_canvas_width / aspect_ratio <= max_canvas_height:
-            new_canvas_width = max_canvas_width
-            new_canvas_height = int(new_canvas_width / aspect_ratio)
-        else:
-            new_canvas_height = max_canvas_height
-            new_canvas_width = int(new_canvas_height * aspect_ratio)
-
-        # Resize the canvas to match the new dimensions
-        self.canvas.config(width=new_canvas_width, height=new_canvas_height)
+    def set_blank_image(self, width, height):
+        """Set a blank image with the given width and height."""
+        self.canvas_w, self.canvas_h = width, height
+        self.canvas.config(width=width, height=height)
+        blank_image = Image.new("RGB", (width, height), color=(50, 50, 50))  # Dark gray placeholder
+        self.set_pil_image(blank_image)
 
     def mouse_down_left(self, event):
         self.__old_event = event
@@ -103,9 +94,8 @@ class PanZoomCanvas(tk.Frame):
 
     def zoom_fit(self, image_width, image_height):
         """ Adjust image to fit within canvas dimensions """
-        self.master.update()
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
+        canvas_width = self.canvas_w
+        canvas_height = self.canvas_h
         self.reset_transform()
         scale = 1.0
         offsetx = offsety = 0.0
@@ -122,8 +112,8 @@ class PanZoomCanvas(tk.Frame):
         if pil_image is None:
             return
         self.pil_image = pil_image
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
+        canvas_width = self.canvas_w
+        canvas_height = self.canvas_h
         mat_inv = np.linalg.inv(self.mat_affine)
         affine_inv = (
             mat_inv[0, 0], mat_inv[0, 1], mat_inv[0, 2],
@@ -144,9 +134,11 @@ class PanZoomCanvas(tk.Frame):
             return
         self.draw_image(self.pil_image)
 
-    def set_pil_image(self, pil_image):
-        """Set a PIL image directly."""
+    def set_pil_image(self, pil_image, width=None, height=None):
+        """Set a PIL image directly and update canvas dimensions."""
         self.pil_image = pil_image
-        self.adjust_canvas_to_image()
+        self.canvas_w = width if width else self.canvas_w
+        self.canvas_h = height if height else self.canvas_h
+        self.canvas.config(width=self.canvas_w, height=self.canvas_h)
         self.zoom_fit(self.pil_image.width, self.pil_image.height)
         self.redraw_image()
