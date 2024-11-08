@@ -1,13 +1,12 @@
 import numpy as np
 
 
+# Count non-zero neighbors of p
 def B(p):
-  # Count non-zero neighbors of p
   return np.sum(p)
 
-
+# Count transitions from 0 to 1 in the ordered sequence
 def A(p):
-  # Count transitions from 0 to 1 in the ordered sequence
   p.append(p[0])
   count = 0
   for i in range(len(p) - 1):
@@ -102,7 +101,7 @@ def find_branch_and_end_points(skeleton):
       if skeleton[i, j] == 1:
         neighbors = get_p(skeleton, i, j)
 
-        count = np.sum(neighbors)
+        count = B(neighbors)
 
         transitions = A(neighbors + [neighbors[0]])
 

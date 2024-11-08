@@ -1,4 +1,5 @@
 import threading
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import numpy as np
@@ -56,7 +57,7 @@ class ImageSkeletonApp:
                                         mode="determinate")
     self.progress_bar.pack(pady=10)
 
-    # Frame for side-by-side canvases
+    # Frame for side-by-side canvases with titles
     self.canvas_frame = tk.Frame(root)
     self.canvas_frame.pack(pady=10, expand=True)
 
@@ -66,17 +67,23 @@ class ImageSkeletonApp:
     self.processed_canvas = PanZoomCanvas(self.canvas_frame)
     self.processed_canvas.grid(row=0, column=1, padx=5, pady=5)
 
+    # Add labels below each canvas
+    self.original_label = tk.Label(self.canvas_frame, text="Original Image")
+    self.original_label.grid(row=1, column=0, pady=5)
+    self.processed_label = tk.Label(self.canvas_frame,
+                                    text="Skeleton")
+    self.processed_label.grid(row=1, column=1, pady=5)
+
     # Define fixed sizes for canvas to prevent resizing after image upload
     self.canvas_width = 512
     self.canvas_height = 512
-
     self.processing_thread = None  # To track the skeletonization thread
 
   def upload_image(self):
     try:
       file_path = filedialog.askopenfilename(
         filetypes=[("PNG files", "*.png"), ("JPEG files", "*.jpg"),
-                   ("BMP files", "*.bmp")]
+                   ("BMP files", "*.bmp"), ("WebP files", "*.webp")]
       )
       if file_path:
         self.original_canvas.set_image(file_path, self.canvas_width,
@@ -111,6 +118,7 @@ class ImageSkeletonApp:
 
   def process_image(self):
     if self.original_canvas.pil_image:
+      start_time = time.time()
       # Convert to grayscale and binarize
       image = self.original_canvas.pil_image
       gray_image = image.convert("L")
@@ -123,11 +131,9 @@ class ImageSkeletonApp:
       # Perform skeletonization
       skeleton = hilditch_skeletonize(binary_image, self.bg_color.get(),
                                       self.progress_bar) * 255
-      processed_image = Image.fromarray(skeleton.astype(np.uint8))
 
       # Find endpoints and branch points
-      end_points, branch_points = find_branch_and_end_points(
-        skeleton)
+      end_points, branch_points = find_branch_and_end_points(skeleton)
 
       # Convert the skeleton to RGB for colored marking
       colored_image = np.stack([skeleton] * 3, axis=-1).astype(np.uint8)
@@ -143,6 +149,12 @@ class ImageSkeletonApp:
 
       # Convert the numpy array to an Image object
       final_image = Image.fromarray(colored_image)
+
+      # Кінець заміру часу
+      end_time = time.time()
+      # Виведення часу виконання у секундах
+      execution_time = end_time - start_time
+      print(f"Час виконання: {execution_time:.4f} секунд")
 
       # Display the processed image with colored points
       self.processed_canvas.set_pil_image(final_image)
