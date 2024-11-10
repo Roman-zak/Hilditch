@@ -79,6 +79,7 @@ class ImageSkeletonApp:
     self.canvas_height = 512
     self.processing_thread = None  # To track the skeletonization thread
 
+  # comment
   def upload_image(self):
     try:
       file_path = filedialog.askopenfilename(
